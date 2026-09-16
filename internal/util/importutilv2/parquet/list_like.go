@@ -86,9 +86,10 @@ func canBulkCopyUint8ListValues(listReader *listLikeArray, uint8Reader *array.Ui
 }
 
 func getListLikeArrayData[T any](listReader *listLikeArray, getElement func(int) (T, error), outputArray func(arr []T, valid bool)) error {
-	_, fixedSize := listReader.FixedSize()
 	for i := 0; i < listReader.Len(); i++ {
-		if fixedSize && listReader.IsNull(i) {
+		// Validity comes from the Arrow null bitmap. Empty lists (start==end)
+		// are valid values, not NULLs; using offset equality would turn [] into NULL.
+		if listReader.IsNull(i) {
 			outputArray(nil, false)
 			continue
 		}
@@ -102,11 +103,7 @@ func getListLikeArrayData[T any](listReader *listLikeArray, getElement func(int)
 			}
 			arrData = append(arrData, elementVal)
 		}
-		valid := start != end
-		if fixedSize {
-			valid = !listReader.IsNull(i)
-		}
-		outputArray(arrData, valid)
+		outputArray(arrData, true)
 	}
 	return nil
 }
